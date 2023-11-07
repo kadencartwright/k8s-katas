@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: http-server-deployment
+  labels: 
+    app: http-server
+spec:
+  selector:
+    matchLabels:
+      app: http-server
+  template:
+    metadata: 
+      name: http-server
+      labels:
+        app: http-server
+    spec:
+      containers: 
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: nginx-conf
+          items:
+            - key: nginx.conf
+              path: nginx.conf
+---
+apiVersion: v1
+kind: Service
+metadata: 
+  name: http-server-service
+spec: 
+  selector:
+    app: http-server
+  ports:
+    - protocol: TCP
+      port: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: 001-simple-http-server 
+data:
+  nginx.conf: |
+    events {
+        worker_connections 768;
+    }
+    http {
+        server {
+          listen       80;
+          location / {
+            default_type text/html;
+            return 200 "<!DOCTYPE html><h2>hello world!</h2>\n";
+          }
+        }
+      }
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-server-ingress 
+spec:
+  ingressClassName: traefik
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: http-server-service
+            port:
+              number: 80
+---
